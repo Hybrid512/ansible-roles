@@ -1,0 +1,84 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for xrdp
+- name: "Create sources folders"
+  ansible.builtin.file:
+    path: "/opt/src"
+    state: directory
+    mode: '0755'
+    owner: 'root'
+    group: 'root'
+
+- name: Clone Xrdp repository
+  ansible.builtin.git:
+    repo: "{{ item.repo }}"
+    version: "{{ item.version | default('HEAD') }}"
+    dest: "/opt/src/{{ item.name }}"
+    recursive: true
+    depth: 1
+  loop: "{{ xrdp_git_repos }}"
+
+- name: Build Xrdp
+  ansible.builtin.shell: |
+    ./scripts/install_xrdp_build_dependencies_with_apt.sh max
+    ./bootstrap
+    ./configure --enable-fuse --enable-pixman --enable-x264
+    make -j {{ ansible_processor_vcpus }}
+    make install
+  args:
+    chdir: /opt/src/xrdp
+    creates: /usr/local/sbin/xrdp
+
+- name: Build Xorgxrdp
+  ansible.builtin.shell: |
+    ./scripts/install_xorgxrdp_build_dependencies_with_apt.sh
+    ./bootstrap
+    ./configure --enable-glamor
+    make -j {{ ansible_processor_vcpus }}
+    make install
+  args:
+    chdir: /opt/src/xorgxrdp
+    creates: /usr/local/bin/Xorg.wrap
+
+- name: Linking xrdp binaries
+  ansible.builtin.file:
+    src: "/usr/local/sbin/{{ item }}"
+    dest: "/usr/sbin/{{ item }}"
+    state: link
+    owner: 'root'
+    group: 'root'
+  loop:
+    - xrdp
+    - xrdp-sesman
+
+- name: Enable Xrdp
+  ansible.builtin.systemd:
+    name: xrdp.service
+    state: started
+    enabled: true
+
+- name: Enable Ubuntu desktop for Xrdp
+  ansible.builtin.copy:
+    dest: /etc/profile.d/xrdp.sh
+    content: |
+      export DESKTOP_SESSION=ubuntu
+      export GNOME_SHELL_SESSION_MODE=ubuntu
+      export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+    owner: 'root'
+    group: 'root'
+    mode: '0755'
+
+- name: Ensure X wrapper config allows non-console users
+  ansible.builtin.copy:
+    src: Xwrapper.config
+    dest: /etc/X11/Xwrapper.config
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Insert a short pause before the window manager starts
+  ansible.builtin.lineinfile:
+    path: /etc/xrdp/startwm.sh
+    line: 'sleep 2'
+    insertbefore: '^\s*wm_start'
+    state: present

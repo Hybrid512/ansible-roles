@@ -1,0 +1,14 @@
+#SPDX-License-Identifier: MIT-0
+---
+# Default variables for the xrdp role
+# You can override `xrdp_git_repos` in group_vars/all.yml to pin tags/branches
+xrdp_git_repos:
+  - name: 'xrdp'
+    repo: 'https://github.com/neutrinolabs/xrdp.git'
+    version: 'HEAD'
+  - name: 'xorgxrdp'
+    repo: 'https://github.com/neutrinolabs/xorgxrdp.git'
+    version: 'HEAD'
+  - name: 'pipewire-module-xrdp'
+    repo: 'https://github.com/neutrinolabs/pipewire-module-xrdp.git'
+    version: 'HEAD'
